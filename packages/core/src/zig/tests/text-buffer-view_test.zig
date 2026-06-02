@@ -196,6 +196,29 @@ test "TextBufferView word wrapping - basic word wrap at space" {
     try std.testing.expectEqual(@as(u32, 2), wrapped_count);
 }
 
+test "TextBufferView word wrapping - CJK graphemes fill line after punctuation" {
+    const pool = gp.initGlobalPool(std.testing.allocator);
+    defer gp.deinitGlobalPool();
+    const link_pool = link.initGlobalLinkPool(std.testing.allocator);
+    defer link.deinitGlobalLinkPool();
+
+    var tb = try TextBuffer.init(std.testing.allocator, pool, link_pool, .wcwidth);
+    defer tb.deinit();
+
+    var view = try TextBufferView.init(std.testing.allocator, tb);
+    defer view.deinit();
+
+    try tb.setText("一二，三四五六七");
+
+    view.setWrapMode(.word);
+    view.setWrapWidth(10);
+
+    const lines = view.getVirtualLines();
+    try std.testing.expectEqual(@as(usize, 2), lines.len);
+    try std.testing.expectEqual(@as(u32, 10), lines[0].width_cols);
+    try std.testing.expectEqual(@as(u32, 6), lines[1].width_cols);
+}
+
 test "TextBufferView word wrapping - long word exceeds width" {
     const pool = gp.initGlobalPool(std.testing.allocator);
     defer gp.deinitGlobalPool();

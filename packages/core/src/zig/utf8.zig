@@ -197,8 +197,8 @@ inline fn isUnicodeWrapBreak(cp: u21) bool {
 }
 
 // WordClass keeps word-boundary behavior predictable in mixed-script text.
-// We split between ASCII word runs and CJK word runs, and we keep each
-// CJK run grouped as one unit.
+// ASCII word runs stay grouped, while CJK word graphemes can soft-wrap
+// between adjacent Han/Kana/Hangul characters.
 const WordClass = enum {
     ascii_word,
     cjk_word,
@@ -255,9 +255,22 @@ inline fn isCjkAsciiTransition(prev_class: WordClass, curr_class: WordClass) boo
         (prev_class == .ascii_word and curr_class == .cjk_word);
 }
 
+inline fn isWrapBoundaryBetween(prev_class: WordClass, curr_class: WordClass, include_cjk_internal: bool) bool {
+    return isCjkAsciiTransition(prev_class, curr_class) or
+        (include_cjk_internal and prev_class == .cjk_word and curr_class == .cjk_word);
+}
+
 // Nothing needed here - using uucode.grapheme.isBreak directly
 
 pub fn findWrapBreaks(text: []const u8, result: *WrapBreakResult, width_method: WidthMethod) !void {
+    try findWrapBreaksInternal(text, result, width_method, false);
+}
+
+pub fn findLineWrapBreaks(text: []const u8, result: *WrapBreakResult, width_method: WidthMethod) !void {
+    try findWrapBreaksInternal(text, result, width_method, true);
+}
+
+fn findWrapBreaksInternal(text: []const u8, result: *WrapBreakResult, width_method: WidthMethod, include_cjk_internal: bool) !void {
     // This function clears previous results and writes fresh break points.
     // Callers should treat `result.breaks` as replaced after the call.
     _ = width_method; // Currently unused, but kept for API consistency
@@ -284,7 +297,7 @@ pub fn findWrapBreaks(text: []const u8, result: *WrapBreakResult, width_method: 
         // Fast path: all ASCII
         if (!@reduce(.Or, is_non_ascii)) {
             const first_class = classifyWordClass(text[pos]);
-            if (have_current_grapheme and isCjkAsciiTransition(current_grapheme_class, first_class)) {
+            if (have_current_grapheme and isWrapBoundaryBetween(current_grapheme_class, first_class, include_cjk_internal)) {
                 try result.breaks.append(result.allocator, .{
                     .byte_offset = current_grapheme_byte_offset,
                     .char_offset = current_grapheme_char_offset,
@@ -365,7 +378,7 @@ pub fn findWrapBreaks(text: []const u8, result: *WrapBreakResult, width_method: 
 
                 if (is_break) {
                     const curr_class = classifyWordClass(curr_cp);
-                    if (have_current_grapheme and isCjkAsciiTransition(current_grapheme_class, curr_class)) {
+                    if (have_current_grapheme and isWrapBoundaryBetween(current_grapheme_class, curr_class, include_cjk_internal)) {
                         try result.breaks.append(result.allocator, .{
                             .byte_offset = current_grapheme_byte_offset,
                             .char_offset = current_grapheme_char_offset,
@@ -402,7 +415,7 @@ pub fn findWrapBreaks(text: []const u8, result: *WrapBreakResult, width_method: 
 
                 if (is_break) {
                     const curr_class = classifyWordClass(dec.cp);
-                    if (have_current_grapheme and isCjkAsciiTransition(current_grapheme_class, curr_class)) {
+                    if (have_current_grapheme and isWrapBoundaryBetween(current_grapheme_class, curr_class, include_cjk_internal)) {
                         try result.breaks.append(result.allocator, .{
                             .byte_offset = current_grapheme_byte_offset,
                             .char_offset = current_grapheme_char_offset,
@@ -443,7 +456,7 @@ pub fn findWrapBreaks(text: []const u8, result: *WrapBreakResult, width_method: 
 
             if (is_break) {
                 const curr_class = classifyWordClass(curr_cp);
-                if (have_current_grapheme and isCjkAsciiTransition(current_grapheme_class, curr_class)) {
+                if (have_current_grapheme and isWrapBoundaryBetween(current_grapheme_class, curr_class, include_cjk_internal)) {
                     try result.breaks.append(result.allocator, .{
                         .byte_offset = current_grapheme_byte_offset,
                         .char_offset = current_grapheme_char_offset,
@@ -477,7 +490,7 @@ pub fn findWrapBreaks(text: []const u8, result: *WrapBreakResult, width_method: 
 
             if (is_break) {
                 const curr_class = classifyWordClass(dec.cp);
-                if (have_current_grapheme and isCjkAsciiTransition(current_grapheme_class, curr_class)) {
+                if (have_current_grapheme and isWrapBoundaryBetween(current_grapheme_class, curr_class, include_cjk_internal)) {
                     try result.breaks.append(result.allocator, .{
                         .byte_offset = current_grapheme_byte_offset,
                         .char_offset = current_grapheme_char_offset,

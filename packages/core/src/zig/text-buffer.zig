@@ -160,6 +160,10 @@ pub const UnifiedTextBuffer = struct {
         return chunk.getWrapOffsets(self.allocator, &self.mem_registry, self.width_method);
     }
 
+    pub fn getLineWrapOffsetsFor(self: *const Self, chunk: *const TextChunk) TextBufferError![]const utf8.WrapBreak {
+        return chunk.getLineWrapOffsets(self.allocator, &self.mem_registry, self.width_method);
+    }
+
     /// Accessor: walk all lines and segments via callbacks.
     pub fn walkLinesAndSegments(
         self: *const Self,

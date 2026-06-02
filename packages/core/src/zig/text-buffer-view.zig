@@ -305,7 +305,7 @@ pub const UnifiedTextBufferView = struct {
         if (total_width == 0) return .{ .char_count = 0, .width = 0 };
         if (total_width <= max_width) return .{ .char_count = total_width, .width = total_width };
 
-        const wrap_offsets = self.text_buffer.getWrapOffsetsFor(chunk) catch {
+        const wrap_offsets = self.text_buffer.getLineWrapOffsetsFor(chunk) catch {
             const fit_width = @min(max_width, total_width);
             return .{ .char_count = fit_width, .width = fit_width };
         };
@@ -1142,7 +1142,7 @@ pub const UnifiedTextBufferView = struct {
 
                     if (wctx.wrap_mode == .word) {
                         const chunk_bytes = chunk.getBytes(wctx.text_buffer.memRegistry());
-                        const wrap_offsets = wctx.text_buffer.getWrapOffsetsFor(chunk) catch &[_]utf8.WrapBreak{};
+                        const wrap_offsets = wctx.text_buffer.getLineWrapOffsetsFor(chunk) catch &[_]utf8.WrapBreak{};
                         const is_ascii_only = (chunk.flags & TextChunk.Flags.ASCII_ONLY) != 0;
                         const graphemes: []const GraphemeInfo = if (is_ascii_only)
                             &[_]GraphemeInfo{}

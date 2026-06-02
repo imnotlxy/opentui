@@ -41,6 +41,7 @@ pub const TextChunk = struct {
     flags: u8 = 0,
     graphemes: ?[]GraphemeInfo = null,
     wrap_offsets: ?[]utf8.WrapBreak = null,
+    line_wrap_offsets: ?[]utf8.WrapBreak = null,
 
     pub const Flags = struct {
         pub const ASCII_ONLY: u8 = 0b00000001; // Printable ASCII only (32..126).
@@ -127,6 +128,32 @@ pub const TextChunk = struct {
         // Use toOwnedSlice to transfer ownership without copying
         const wrap_offsets = try wrap_result.breaks.toOwnedSlice(allocator);
         mut_self.wrap_offsets = wrap_offsets;
+
+        return wrap_offsets;
+    }
+
+    /// Lazily compute and cache line-wrap offsets for this chunk.
+    /// Unlike word-boundary offsets, these include soft wrap opportunities
+    /// between adjacent CJK graphemes.
+    pub fn getLineWrapOffsets(
+        self: *const TextChunk,
+        allocator: Allocator,
+        mem_registry: *const MemRegistry,
+        width_method: utf8.WidthMethod,
+    ) TextBufferError![]const utf8.WrapBreak {
+        const mut_self = @constCast(self);
+        if (self.line_wrap_offsets) |cached| {
+            return cached;
+        }
+
+        const chunk_bytes = self.getBytes(mem_registry);
+        var wrap_result = utf8.WrapBreakResult.init(allocator);
+        errdefer wrap_result.deinit();
+
+        try utf8.findLineWrapBreaks(chunk_bytes, &wrap_result, width_method);
+
+        const wrap_offsets = try wrap_result.breaks.toOwnedSlice(allocator);
+        mut_self.line_wrap_offsets = wrap_offsets;
 
         return wrap_offsets;
     }
@@ -303,6 +330,7 @@ pub const Segment = union(enum) {
                 .flags = left_chunk.flags,
                 .graphemes = null,
                 .wrap_offsets = null,
+                .line_wrap_offsets = null,
             },
         };
     }
